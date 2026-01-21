@@ -34,5 +34,5 @@ TODO
 - [x] Reading grist table from marimo
 - [x] Reloading cells automatically when grist values change
 - [x] Applying actions to the grist document from marimo
-- [ ] Fix the display color theme (light / dark)
+- [x] Use the right color theme (light / dark)
 - [ ] import data from multiple files
