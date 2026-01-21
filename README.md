@@ -17,7 +17,7 @@ This project aims to provide a [Marimo](https://marimo.io) notebook inside Grist
 
 Click "add widget to page" inside Grist, and select this widget from the URL:
 ```
-rambip.github.io/grist-marimo-widget
+https://rambip.github.io/grist-marimo-widget
 ```
 
 
@@ -35,4 +35,5 @@ TODO
 - [x] Reloading cells automatically when grist values change
 - [x] Applying actions to the grist document from marimo
 - [x] Use the right color theme (light / dark)
+- [ ] Add a warning when the user tries to use the notebook outside grist
 - [ ] import data from multiple files
