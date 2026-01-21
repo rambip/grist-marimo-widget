@@ -10,7 +10,7 @@
 
 This project aims to provide a [Marimo](https://marimo.io) notebook inside Grist, as a widget.
 
-<img width="863" height="736" alt="image" src="https://github.com/user-attachments/assets/15a9547d-47fc-4122-8af2-8f431a1002df" />
+<img width="865" height="738" alt="image" src="https://github.com/user-attachments/assets/4ae133f3-7eea-4b8a-905b-f5e980867951" />
 
 
 # How to use
