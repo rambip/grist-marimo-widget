@@ -51,6 +51,7 @@ You can read it as a dataframe, for example with `pandas.read_csv("data.json")`
 
 > Marimo has a wonderful feature: autorun.
 > If some cell A is updated, and another cell B depends on the result of A to do a comuptation, then B will be updated.
+
 > In order to provide the same experience with the Grist data, Grist will force the setup cell to re-run each time values in the table change. Since the setup cell executes `GRIST_DATA_PATH="data.json"`, this will force all the cells that use `GRIST_DATA_PATH` to rerun.
 
 </details>
@@ -61,7 +62,11 @@ You can read it as a dataframe, for example with `pandas.read_csv("data.json")`
 
 ## Writing to Grist
 
-TODO
+Right now, the only way to update grist tables from marimo is to use the `send_grist_actions`, defined at the top of the notebook.
+
+For more informations about how to use the `userActions` commands, see this post I wrote:
+
+https://community.getgrist.com/t/a-complete-guide-for-useractions-and-action-button/13484
 
 
 # How it works
