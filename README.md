@@ -10,6 +10,9 @@
 
 This project aims to provide a [Marimo](https://marimo.io) notebook inside Grist, as a widget.
 
+<img width="863" height="736" alt="image" src="https://github.com/user-attachments/assets/15a9547d-47fc-4122-8af2-8f431a1002df" />
+
+
 # How to use
 
 Click "add widget to page" inside Grist, and select this widget from the URL:
