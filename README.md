@@ -28,10 +28,12 @@ Once the notebook is loaded, you can use it like any other marimo notebook.
 ⚠️ There are some caveats when you use a notebook inside Grist. 
 </summary>
 The most important thing to understand: the entire notebook runs **in your browser** (python is translated to instructions your browser understands, thank's to [pyodide](https://pyodide.org/en/stable/)). This means that:
+
 - The performance is limited. The memory is limted to 2G, and it will be slower than a classic notebook.
 - Libraries are missing. A lot of libraries have made an effort to be packaged for browsers, but not all of them. See [here](https://docs.marimo.io/guides/wasm/#supported-packages) for more information
 - Some requests might be blocked. Since the notebook runs inside Grist, your notebook has limits regarding what sites he can communicate with. This is a security limitation, preventing that Grist widgets use information about the tables and send them to external sites. This is what CORS is about, you can read more [here](https://ieftimov.com/posts/deep-dive-cors-history-how-it-works-best-practices/). But don't panic: a lot of public APIs will work seemlessly.
 - there are a few more technical limitations, you can read them on [marimo's website](https://docs.marimo.io/guides/wasm/#limitations)
+
 </details>
 
 
