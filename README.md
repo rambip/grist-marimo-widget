@@ -43,11 +43,10 @@ Inside python, the grist data is available as a json file inside `data.json`, in
 
 You can read it as a dataframe, for example with `pandas.read_csv("data.json")`
 
-The file will update each time you change a value in the table
 
 <details>
 <summary>
-    Autorun
+    The file will update each time you change a value in the table
 </summary>
 Marimo has a wonderful feature: autorun.
 If some cell A is updated, and another cell B depends on the result of A to do a comuptation, then B will be updated.
