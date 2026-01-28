@@ -1,41 +1,337 @@
-const bridge = window._marimo_private_PyodideBridge;
-bridge.rpc.addMessageListener("kernelMessage", ({ message }) => {
-  const data = JSON.parse(message)["data"];
-  console.log(`DATA:`);
-  console.log(data);
-  if (data["op"] == "send-ui-element-message") {
-    if (data["ui_element"] == "grist") {
-      const m = data["message"];
-      grist.docApi.applyUserActions(m["actions"]);
-    }
-  }
-});
+// ============================================================================
+// MARIMO-GRIST WIDGET INTEGRATION
+// ============================================================================
 
-grist.ready({ requiredAccess: "full" });
+const GRIST_OPTION_KEY = "marimo_code";
 
-grist.onOptions(async (options, settings) => {
-  const access = settings.accessLevel;
-  if (access == "none") {
-    console.log("no access to document");
+const SETUP_CODE = `
+GRIST_DATA_PATH = "data.json"
+`;
+
+const SEND_GRIST_ACTION_CODE = `
+@app.function(hide_code=True)
+def send_grist_actions(actions):
+    from marimo._messaging.notification import UIElementMessageNotification
+    from marimo._messaging.serde import serialize_kernel_message
+    from marimo._runtime.context import get_context
+
+    if len(actions) == 0:
+        return
+    assert isinstance(actions[0], list) or isinstance(actions[0], tuple), (
+        "You must provide a list of actions"
+    )
+
+    msg = UIElementMessageNotification(
+        ui_element="grist",
+        model_id=None,
+        message={"actions": actions},
+    )
+
+    kernel_msg = serialize_kernel_message(msg)
+    get_context().stream.write(kernel_msg)
+`;
+
+const NOTEBOOK_BASE = `# /// script
+# requires-python = ">=3.11"
+# dependencies = [
+#     "pandas",
+#     "matplotlib",
+#     "polars",
+# ]
+# ///
+
+import marimo
+
+__generated_with = "0.19.0"
+app = marimo.App(width="medium")
+
+with app.setup(hide_code=True):
+    # Don't touch ! This cell will be overwritten each time
+    # the grist data is updated.
+    ${SETUP_CODE.split("\n").join("\n    ")}
+
+${SEND_GRIST_ACTION_CODE}
+`;
+
+// Default empty notebook template
+const POLARS_NOTEBOOK = `${NOTEBOOK_BASE}
+@app.cell()
+def _():
+    import polars as pl
+    import json
+    return (pd,json)
+
+
+@app.cell()
+def _(pd):
+    with open(GRIST_DATA_PATH) as f:
+        df = pl.DataFrame(json.load(f))
+    df
+`;
+
+const DEFAULT_NOTEBOOK = `${NOTEBOOK_BASE}
+@app.cell()
+def _():
+    import pandas as pd
+    return (pd,)
+
+
+@app.cell()
+def _(pd):
+    df = pd.read_json(GRIST_DATA_PATH)
+    df
+`;
+
+const NOTEBOOK_TEMPLATES = {
+  default: DEFAULT_NOTEBOOK,
+  polars: POLARS_NOTEBOOK,
+};
+
+let bridge = null;
+let pendingRecords = null;
+let hasTableAccess = false;
+let saveEnabled = false;
+
+// ============================================================================
+// MARIMO INITIALIZATION
+// ============================================================================
+
+async function initializeMarimo(savedCode) {
+  const code = savedCode || DEFAULT_NOTEBOOK;
+  localStorage.setItem("marimo:file", JSON.stringify(code));
+
+  // Set marimo mount config with our code
+  window.__MARIMO_MOUNT_CONFIG__ = {
+    filename: "notebook.py",
+    mode: "edit",
+    version: "0.19.4",
+    serverToken: "unused",
+    // code: JSON.stringify(code),
+    config: {
+      ai: {
+        custom_providers: {},
+        models: { custom_models: [], displayed_models: [] },
+      },
+      completion: {
+        activate_on_typing: true,
+        copilot: false,
+        signature_hint_on_typing: false,
+      },
+      diagnostics: { sql_linter: true },
+      display: {
+        cell_output: "below",
+        code_editor_font_size: 14,
+        dataframes: "rich",
+        default_table_max_columns: 50,
+        default_table_page_size: 10,
+        default_width: "medium",
+        reference_highlighting: false,
+        theme: "system",
+      },
+      formatting: { line_length: 79 },
+      keymap: { overrides: {}, preset: "default" },
+      language_servers: {
+        pylsp: {
+          enable_flake8: false,
+          enable_mypy: true,
+          enable_pydocstyle: false,
+          enable_pyflakes: false,
+          enable_pylint: false,
+          enable_ruff: true,
+          enabled: false,
+        },
+      },
+      mcp: { mcpServers: {}, presets: [] },
+      package_management: { manager: "uv" },
+      runtime: {
+        auto_instantiate: true,
+        auto_reload: "off",
+        default_sql_output: "auto",
+        on_cell_change: "autorun",
+        output_max_bytes: 8000000,
+        reactive_tests: true,
+        std_stream_max_bytes: 1000000,
+        watcher_on_save: "lazy",
+      },
+      save: {
+        autosave: "after_delay",
+        autosave_delay: 1000,
+        format_on_save: false,
+      },
+      server: { browser: "default", follow_symlink: false },
+      snippets: { custom_paths: [], include_default_snippets: true },
+    },
+    configOverrides: {},
+    appConfig: { sql_output: "auto", width: "medium" },
+    view: { showAppCode: true },
+    notebook: null,
+    session: null,
+    runtimeConfig: null,
+  };
+
+  const script = document.createElement("script");
+  script.type = "module";
+  script.crossOrigin = "anonymous";
+  script.src = window.__MARIMO_ENTRYPOINT_URL__;
+  document.head.appendChild(script);
+
+  // Wait for bridge to be available
+  console.info("WAIT FOR BRIDGE");
+  await waitForBridge();
+  setupRPCListeners();
+  console.info("SETUP DONE");
+
+  // Check permissions and show error if needed
+  if (!hasTableAccess) {
+    console.error("Widget does not have permission to read the table");
+    console.log(bridge);
     await bridge.sendRun({
       cellIds: ["setup"],
       codes: [
-        `raise ValueError("This widget does not have the permission to read the table. Please change the widget permissions")`,
+        'raise ValueError("This widget does not have permission to read the table. Please change the widget permissions")',
       ],
     });
   }
-});
-grist.onRecords(async (table) => {
-  console.log("TABLE:");
-  console.log(table);
 
+  // Sync any records that arrived before bridge was ready
+  if (pendingRecords) {
+    console.log("Syncing pending records from initial load...");
+    await syncGristData(pendingRecords);
+    pendingRecords = null;
+  }
+}
+
+function waitForBridge() {
+  return new Promise((resolve) => {
+    const checkBridge = setInterval(() => {
+      if (window._marimo_private_PyodideBridge) {
+        bridge = window._marimo_private_PyodideBridge;
+        clearInterval(checkBridge);
+        resolve();
+      }
+    }, 100);
+  });
+}
+
+// ============================================================================
+// RPC LISTENERS
+// ============================================================================
+
+function setupRPCListeners() {
+  // Listen to kernel messages (Worker -> Parent)
+  bridge.rpc.addMessageListener("kernelMessage", handleKernelMessage);
+
+  // Hook into RPC debug hooks to catch save request (Parent -> Worker)
+  bridge.rpc._setDebugHooks({
+    onSend: async (message) => {
+      console.info("[rpc] Parent -> Worker", message);
+      if (message.type == "request" && message.method == "saveNotebook") {
+        const result = await bridge.sendFileDetails({
+          path: "/marimo/notebook.py",
+        });
+
+        if (saveEnabled) {
+          await grist.setOption(GRIST_OPTION_KEY, result.contents);
+          console.log("saved notebook");
+        }
+      }
+    },
+    onReceive: (message) => {},
+  });
+}
+
+function handleKernelMessage({ message }) {
+  const data = JSON.parse(message).data;
+
+  // Handle Grist actions from marimo
+  if (data.op === "send-ui-element-message" && data.ui_element === "grist") {
+    const actions = data.message.actions;
+    grist.docApi.applyUserActions(actions);
+  }
+}
+
+// ============================================================================
+// GRIST DATA SYNC
+// ============================================================================
+
+async function syncGristData(records) {
+  if (!bridge) {
+    console.warn("Bridge not ready, skipping data sync");
+    return;
+  }
+
+  console.log("Syncing Grist data to marimo...");
+
+  // Write data to pyodide filesystem
   await bridge.sendUpdateFile({
     path: "/marimo/data.json",
-    contents: JSON.stringify(table),
+    contents: JSON.stringify(records),
   });
 
+  // Run setup cell to update GRIST_DATA_PATH
   await bridge.sendRun({
     cellIds: ["setup"],
-    codes: [`GRIST_DATA_PATH = "data.json"`],
+    codes: [SETUP_CODE],
   });
+
+  console.log("✓ Data synced successfully");
+}
+
+// ============================================================================
+// GRIST INTEGRATION
+// ============================================================================
+
+grist.ready({
+  requiredAccess: "read table",
+  // TODO: show button to chose notebook template
+  onEditOptions: async () => {
+    console.warn("clear all widget state");
+    await grist.clearOptions();
+    console.log("GRIST_OPTIONS", await grist.getOptions());
+    saveEnabled = false;
+  },
 });
+
+// Sync data when table updates
+grist.onRecords(async (records) => {
+  if (!bridge) {
+    console.log("Bridge not ready yet, storing records for later sync...");
+    pendingRecords = records;
+    return;
+  }
+  await syncGristData(records);
+});
+
+grist.onOptions(async (options, settings) => {
+  if (settings.accessLevel != "none") {
+    hasTableAccess = true;
+  }
+});
+
+window.addEventListener("hashchange", async function () {
+  // Récupérer la nouvelle valeur de l'ancre
+  const hash = window.location.hash;
+  const matches = hash.match(/\#grist_marimo_template_(.*)/);
+  console.log("HASH", hash, matches);
+  if (matches?.length != 2) {
+    return;
+  }
+
+  const template_name = matches[1];
+  if (NOTEBOOK_TEMPLATES[template_name] === null) {
+    console.error(`template not found: ${template_name}`);
+    return;
+  }
+  await grist.setOption(GRIST_OPTION_KEY, NOTEBOOK_TEMPLATES[template_name]);
+  window.location.reload();
+});
+
+async function init() {
+  const options = await grist.getOptions();
+  const savedCode = (options && options[GRIST_OPTION_KEY]) || null;
+
+  await initializeMarimo(savedCode);
+  console.log("Marimo-Grist widget initialized");
+}
+
+init();
