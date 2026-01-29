@@ -16,6 +16,7 @@ HTML_TEMPLATE = r"""
 <script data-marimo="true">window.__MARIMO_ENTRYPOINT_URL__ = "\2"</script>
 \3
 <script src="https://docs.getgrist.com/grist-plugin-api.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
 <script src="grist.js" defer></script>
 <marimo-filename hidden>notebook.py</marimo-filename>
 <marimo-wasm hidden=""></marimo-wasm>
@@ -39,8 +40,8 @@ HTML_TEMPLATE = r"""
 Load Templates
 </summary>
 <ul class="template-links-container">
-<li><a href="#grist_marimo_template_default">Default template</a></li>
-<li><a href="#grist_marimo_template_polars">Polars template</a></li>
+<li><a href="#grist_marimo_template/default">Default template</a></li>
+<li><a href="#grist_marimo_template/polars">Polars template</a></li>
 </div>
 </details>
 </nav>

@@ -78,7 +78,7 @@ def _():
 
 @app.cell()
 def _(pd):
-    df = pd.read_json(GRIST_DATA_PATH)
+    df = pd.read_json(GRIST_DATA_PATH).set_index("id")
     df
 `;
 
@@ -90,7 +90,7 @@ const NOTEBOOK_TEMPLATES = {
 let bridge = null;
 let pendingRecords = null;
 let hasTableAccess = false;
-let saveEnabled = false;
+let gristActionMarker = false;
 
 // ============================================================================
 // MARIMO INITIALIZATION
@@ -178,7 +178,7 @@ async function initializeMarimo(savedCode) {
   // Wait for bridge to be available
   console.info("WAIT FOR BRIDGE");
   await waitForBridge();
-  setupRPCListeners();
+  bridge.rpc.addMessageListener("kernelMessage", handleKernelMessage);
   console.info("SETUP DONE");
 
   // Check permissions and show error if needed
@@ -217,35 +217,13 @@ function waitForBridge() {
 // RPC LISTENERS
 // ============================================================================
 
-function setupRPCListeners() {
-  // Listen to kernel messages (Worker -> Parent)
-  bridge.rpc.addMessageListener("kernelMessage", handleKernelMessage);
-
-  // Hook into RPC debug hooks to catch save request (Parent -> Worker)
-  bridge.rpc._setDebugHooks({
-    onSend: async (message) => {
-      console.info("[rpc] Parent -> Worker", message);
-      if (message.type == "request" && message.method == "saveNotebook") {
-        const result = await bridge.sendFileDetails({
-          path: "/marimo/notebook.py",
-        });
-
-        if (saveEnabled) {
-          await grist.setOption(GRIST_OPTION_KEY, result.contents);
-          console.log("saved notebook");
-        }
-      }
-    },
-    onReceive: (message) => {},
-  });
-}
-
 function handleKernelMessage({ message }) {
   const data = JSON.parse(message).data;
 
   // Handle Grist actions from marimo
   if (data.op === "send-ui-element-message" && data.ui_element === "grist") {
     const actions = data.message.actions;
+    gristActionMarker = true;
     grist.docApi.applyUserActions(actions);
   }
 }
@@ -288,12 +266,15 @@ grist.ready({
     console.warn("clear all widget state");
     await grist.clearOptions();
     console.log("GRIST_OPTIONS", await grist.getOptions());
-    saveEnabled = false;
   },
 });
 
 // Sync data when table updates
 grist.onRecords(async (records) => {
+  if (gristActionMarker) {
+    gristActionMarker = false;
+    return;
+  }
   if (!bridge) {
     console.log("Bridge not ready yet, storing records for later sync...");
     pendingRecords = records;
@@ -309,21 +290,22 @@ grist.onOptions(async (options, settings) => {
 });
 
 window.addEventListener("hashchange", async function () {
-  // Récupérer la nouvelle valeur de l'ancre
   const hash = window.location.hash;
-  const matches = hash.match(/\#grist_marimo_template_(.*)/);
-  console.log("HASH", hash, matches);
-  if (matches?.length != 2) {
-    return;
+  const match_template = hash.match(/\#grist_marimo_template\/(.*)/)?.at(1);
+  const match_code = hash.match(/\#code\/(.*)/)?.at(1);
+  if (match_template) {
+    if (NOTEBOOK_TEMPLATES[match_template] === null) {
+      console.error(`template not found: ${match_template}`);
+      return;
+    }
+    await grist.setOption(GRIST_OPTION_KEY, NOTEBOOK_TEMPLATES[match_template]);
+    window.location.reload();
   }
-
-  const template_name = matches[1];
-  if (NOTEBOOK_TEMPLATES[template_name] === null) {
-    console.error(`template not found: ${template_name}`);
-    return;
+  if (match_code) {
+    const notebook_code =
+      LZString.decompressFromEncodedURIComponent(match_code);
+    grist.setOption(GRIST_OPTION_KEY, notebook_code);
   }
-  await grist.setOption(GRIST_OPTION_KEY, NOTEBOOK_TEMPLATES[template_name]);
-  window.location.reload();
 });
 
 async function init() {
