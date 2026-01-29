@@ -42,6 +42,7 @@ Load Templates
 <ul class="template-links-container">
 <li><a href="#grist_marimo_template/default">Default template</a></li>
 <li><a href="#grist_marimo_template/polars">Polars template</a></li>
+<li><a href="#grist_marimo_template/duplicate">Data duplication template</a></li>
 </div>
 </details>
 </nav>

@@ -6,14 +6,12 @@ const GRIST_OPTION_KEY = "marimo_code";
 
 const SETUP_CODE = `
 GRIST_DATA_PATH = "data.json"
-`;
 
-const SEND_GRIST_ACTION_CODE = `
-@app.function(hide_code=True)
 def send_grist_actions(actions):
     from marimo._messaging.notification import UIElementMessageNotification
     from marimo._messaging.serde import serialize_kernel_message
     from marimo._runtime.context import get_context
+    from marimo import ui
 
     if len(actions) == 0:
         return
@@ -28,7 +26,11 @@ def send_grist_actions(actions):
     )
 
     kernel_msg = serialize_kernel_message(msg)
-    get_context().stream.write(kernel_msg)
+    ctx = get_context()
+    return ui.run_button(
+        label="update grist table",
+        on_change=lambda x: ctx.stream.write(kernel_msg)
+    )
 `;
 
 const NOTEBOOK_BASE = `# /// script
@@ -49,8 +51,6 @@ with app.setup(hide_code=True):
     # Don't touch ! This cell will be overwritten each time
     # the grist data is updated.
     ${SETUP_CODE.split("\n").join("\n    ")}
-
-${SEND_GRIST_ACTION_CODE}
 `;
 
 // Default empty notebook template
@@ -82,15 +82,35 @@ def _(pd):
     df
 `;
 
+const DATA_DUPLICATION_NOTEBOOK = `${NOTEBOOK_BASE}
+@app.cell()
+def _():
+    import pandas as pd
+    return (pd,)
+
+
+@app.cell()
+def _(pd):
+    df = pd.read_json(GRIST_DATA_PATH).set_index("id")
+    df
+
+@app.cell()
+def _(pd, df, send_grist_actions):
+    CURRENT_TABLE_NAME = "Table1"
+    send_grist_actions([
+        ["AddRecord", CURRENT_TABLE_NAME, None, dict(d)] for _, d in df.iterrows()
+    ])
+`;
+
 const NOTEBOOK_TEMPLATES = {
   default: DEFAULT_NOTEBOOK,
   polars: POLARS_NOTEBOOK,
+  duplicate: DATA_DUPLICATION_NOTEBOOK,
 };
 
 let bridge = null;
 let pendingRecords = null;
 let hasTableAccess = false;
-let gristActionMarker = false;
 
 // ============================================================================
 // MARIMO INITIALIZATION
@@ -223,7 +243,6 @@ function handleKernelMessage({ message }) {
   // Handle Grist actions from marimo
   if (data.op === "send-ui-element-message" && data.ui_element === "grist") {
     const actions = data.message.actions;
-    gristActionMarker = true;
     grist.docApi.applyUserActions(actions);
   }
 }
@@ -260,7 +279,7 @@ async function syncGristData(records) {
 // ============================================================================
 
 grist.ready({
-  requiredAccess: "read table",
+  requiredAccess: "full",
   // TODO: show button to chose notebook template
   onEditOptions: async () => {
     console.warn("clear all widget state");
@@ -271,10 +290,6 @@ grist.ready({
 
 // Sync data when table updates
 grist.onRecords(async (records) => {
-  if (gristActionMarker) {
-    gristActionMarker = false;
-    return;
-  }
   if (!bridge) {
     console.log("Bridge not ready yet, storing records for later sync...");
     pendingRecords = records;
