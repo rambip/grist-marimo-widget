@@ -23,9 +23,10 @@ https://rambip.github.io/grist-marimo-widget
 
 Once the notebook is loaded, you can use it like any other marimo notebook.
 
+<blockquote>
 <details>
 <summary>
-⚠️ There are some caveats when you use a notebook inside Grist. 
+‼️ [click to expand] Caveats when you use a notebook inside Grist. 
 </summary>
 The most important thing to understand: the entire notebook runs **in your browser** (python is translated to instructions your browser understands, thank's to [pyodide](https://pyodide.org/en/stable/)). This means that:
 
@@ -35,7 +36,7 @@ The most important thing to understand: the entire notebook runs **in your brows
 - there are a few more technical limitations, you can read them on [marimo's website](https://docs.marimo.io/guides/wasm/#limitations)
 
 </details>
-
+</blockquote>
 
 ## Reading from Grist
 
@@ -43,22 +44,24 @@ Inside python, the grist data is available as a json file inside `data.json`, in
 
 You can read it as a dataframe, for example with `pandas.read_csv("data.json")`
 
+The file will update each time you change a value in the table
 
+<blockquote>
 <details>
 <summary>
-    The file will update each time you change a value in the table
+    [Click to expand] How autorun works
 </summary>
 
-> Marimo has a wonderful feature: autorun.
-> If some cell A is updated, and another cell B depends on the result of A to do a comuptation, then B will be updated.
+Marimo has a wonderful feature: autorun.
+If some cell A is updated, and another cell B depends on the result of A to do a comuptation, then B will be updated.
 
-> In order to provide the same experience with the Grist data, Grist will force the setup cell to re-run each time values in the table change. Since the setup cell executes `GRIST_DATA_PATH="data.json"`, this will force all the cells that use `GRIST_DATA_PATH` to rerun.
+In order to provide the same experience with the Grist data, Grist will force the setup cell to re-run each time values in the table change. Since the setup cell executes `GRIST_DATA_PATH="data.json"`, this will force all the cells that use `GRIST_DATA_PATH` to rerun.
 
 </details>
+</blockquote>
 
-⚠️ To avoid problems, make sure that:
-- you give the correct permissions to you widget (read table or full access)
-- all the columns you want are set as "visible" in the widget settings. This means that if you create a column, it will not be available in python unless you set it as "visible" manually.
+⚠️ Common problems:
+- if there are columns missing in the dataframes, check that all the columns you want are set as "visible" in the widget settings. This means that if you create a column, it will not be available in python unless you set it as "visible" manually.
 
 ## Writing to Grist
 
@@ -83,6 +86,8 @@ TODO
 - [x] Reloading cells automatically when grist values change
 - [x] Applying actions to the grist document from marimo
 - [x] Use the right color theme (light / dark)
-- [ ] Add examples for using APIs and writing to the grist doc
+- [x] Add examples for using APIs and writing to the grist doc\
+- [x] Save notebook to grist options
+- [x] notebook templates
 - [ ] Add a warning when the user tries to use the notebook outside grist
 - [ ] import data from multiple files
