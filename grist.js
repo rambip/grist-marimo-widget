@@ -282,9 +282,7 @@ grist.ready({
   requiredAccess: "full",
   // TODO: show button to chose notebook template
   onEditOptions: async () => {
-    console.warn("clear all widget state");
-    await grist.clearOptions();
-    console.log("GRIST_OPTIONS", await grist.getOptions());
+    console.warn("options not implemented");
   },
 });
 
